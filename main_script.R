@@ -1,7 +1,7 @@
 ### Integration of the Global Water and Lake Sectors within the ISIMIP framework through scaling of streamflow inputs to lakes
 # Ana I. Ayala. Limnology Unit, Department of Ecology and Genetics, Uppsala University, Uppsala, Sweden.
 # José L. Hinostroza. Faculty of Civil Engineering, National University of Engineering, Lima, Perú.
-# July 2025 
+# July 2025 (updated November 2025)
 
 # libraries
 library(data.table)
@@ -374,12 +374,16 @@ rm(list=ls()[!ls()%in%c("lakes", "qtot", "qg", "dis", "lat", "lon", "date", "fdi
 ### approach I(a/b): lake area <= grid area
 ## validation against observations: https://www.smhi.se/data/hydrologi/ladda-ner-hydrologiska-observationer#param=waterdischargeDaily,stations=core
 
-# Mälaren 102, Siljan 1150, Erken 12809, 149288
-df_selected_lakes <- data.frame(lake=c(102, 1150, 12809, 149288),
+# Mälaren 102, Siljan 1150, Erken 12809, Hasselasjön 152977, 142240, 12791, 12423, Roxen 12965
+df_selected_lakes <- data.frame(lake=c(102, 1150, 12809, 152977, 142240, 12791, 12423, 12965),
                                 smhi=c("smhi-opendata_1_20040_20240814_141851",
                                        "smhi-opendata_1_896_20240924_121048",
                                        "smhi-opendata_1_1743_20240924_121102",
-                                       "smhi-opendata_1_2152_20240423_145021"))
+                                       "smhi-opendata_1_2273_20251002_083833",
+                                       "smhi-opendata_1_1740_20251002_095151",
+                                       "smhi-opendata_1_348_20251003_121922",
+                                       "smhi-opendata_1_2434_20251003_125726",
+                                       "smhi-opendata_1_2454_20251002_153326, smhi-opendata_1_2432_20251002_153351"))
 # method for selection of the upstream grids
 method <- "slope" # slope: grid with steepest slope, all: all grids at the same level
 dir.create("outputs_obs")
@@ -525,14 +529,45 @@ for (l in df_selected_lakes$lake) {
   # Mälaren - HydroLAKES: 102 - SMHI: 20040
   # Siljan - HydroLAKES: 1150 - SMHI: 896
   # Erken - HydroLAKES: 12809 - SMHI: 1743
-  # HydroLAKES: 149288 - SMHI: 2152
-  qin_obs <- fread(file.path("./inputs/smhi_obs", paste0(df_selected_lakes[df_selected_lakes$lake==l, ]$smhi,".csv")), skip=7, sep=";", fill=TRUE)
-  qin_obs[, c("V3","V4","V5") := NULL]
-  setnames(qin_obs, c("date", "qin"))
-  qin_obs_monthly <- monthly_average(qin_obs, lag=FALSE) # lag: TRUE or FALSE
-  colnames(qin_obs_monthly)[[2]] <- "qin_obs"
-  qin_obs_yearly <- yearly_average(qin_obs)
-  colnames(qin_obs_yearly)[[2]] <- "qin_obs"
+  # (unnamed) - HydroLAKES: 149288 - SMHI: 2152
+  # Hasselasjön - HydroLAKES: 152977 - SMHI: 2273
+  # (unnamed) - HydroLAKES: 142240 - SMHI: 1740
+  # (unnamed) - HydroLAKES: 12791 - SMHI: 348
+  # (unnamed) - HydroLAKES: 12423 - SMHI: 2434
+  # Roxen - HydroLAKES: 12965 - SMHI: 2454+2432
+  
+  if (l==12965) {
+    # SMHI: 2454
+    qin_obs1 <- fread(file.path("./inputs/smhi_obs", paste0(trimws(sub(",.*$", "", df_selected_lakes[df_selected_lakes$lake==l, ]$smhi)),".csv")), skip=7, sep=";", fill=TRUE)
+    qin_obs1[, c("V3","V4","V5") := NULL]
+    setnames(qin_obs1, c("date", "qin"))
+    qin_obs1_monthly <- monthly_average(qin_obs1, lag=FALSE) # lag: TRUE or FALSE
+    colnames(qin_obs1_monthly)[[2]] <- "qin_obs"
+    qin_obs1_yearly <- yearly_average(qin_obs1)
+    colnames(qin_obs1_yearly)[[2]] <- "qin_obs"
+    # SMHI: 2432
+    qin_obs2 <- fread(file.path("./inputs/smhi_obs", paste0(trimws(sub("^[^,]*,", "", df_selected_lakes[df_selected_lakes$lake==l, ]$smhi)),".csv")), skip=7, sep=";", fill=TRUE)
+    qin_obs2[, c("V3","V4","V5") := NULL]
+    setnames(qin_obs2, c("date", "qin"))
+    qin_obs2_monthly <- monthly_average(qin_obs2, lag=FALSE) # lag: TRUE or FALSE
+    colnames(qin_obs2_monthly)[[2]] <- "qin_obs"
+    qin_obs2_yearly <- yearly_average(qin_obs2)
+    colnames(qin_obs2_yearly)[[2]] <- "qin_obs"
+    # merge 2454 and 2432
+    qin_obs_monthly <- merge(qin_obs1_monthly, qin_obs2_monthly, by="date")
+    qin_obs_monthly$qin_obs <- qin_obs_monthly$qin_obs.x+qin_obs_monthly$qin_obs.y
+    qin_obs_yearly <- merge(qin_obs1_yearly, qin_obs2_yearly, by="year")
+    qin_obs_yearly$qin_obs <- qin_obs_yearly$qin_obs.x+qin_obs_yearly$qin_obs.y
+    
+  } else {
+    qin_obs <- fread(file.path("./inputs/smhi_obs", paste0(df_selected_lakes[df_selected_lakes$lake==l, ]$smhi,".csv")), skip=7, sep=";", fill=TRUE)
+    qin_obs[, c("V3","V4","V5") := NULL]
+    setnames(qin_obs, c("date", "qin"))
+    qin_obs_monthly <- monthly_average(qin_obs, lag=FALSE) # lag: TRUE or FALSE
+    colnames(qin_obs_monthly)[[2]] <- "qin_obs"
+    qin_obs_yearly <- yearly_average(qin_obs)
+    colnames(qin_obs_yearly)[[2]] <- "qin_obs"
+  }
   
   # merge: simulations and observations (grdc data, hype outputs)
   qin_sim_obs_monthly <- merge(qin_sim, qin_obs_monthly, by="date")
@@ -640,7 +675,7 @@ grid_area <- areakm2lat(nearest_f1(lake$Cent_Lat)[1])
 # watershed area (km2)
 wshd_area <- lake$Wshd_area
 
-# number of grids to pick up: ratio between watershed area and  grid area
+# number of grids to pick up: ratio between watershed area and grid area
 ratio_area <- wshd_area/grid_area
 ratio_area <- ifelse(ratio_area<1, 1, floor(ratio_area))
 
